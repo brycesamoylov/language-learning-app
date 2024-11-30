@@ -48,6 +48,7 @@ class PhraseBase(BaseModel):
     translation: str
     level: str
     category: str
+    extra_data: Optional[Dict] = None
 
 class PhraseCreate(PhraseBase):
     language_id: int
@@ -58,6 +59,7 @@ class Phrase(PhraseBase):
     language_id: int
     lesson_id: Optional[int] = None
     audio_url: Optional[str] = None
+    extra_data: Optional[Dict] = None
 
     class Config:
         from_attributes = True
@@ -86,7 +88,7 @@ class LessonDetail(LessonBase):
     id: int
     language_id: int
     content: Dict[str, Any]  # This will include practice_words and other content
-    phrases: List[Any] = []
+    phrases: List[Phrase] = []  # Update to use Phrase schema
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

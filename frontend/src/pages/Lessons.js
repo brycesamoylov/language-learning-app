@@ -6,6 +6,7 @@ import {
   Card,
   CardContent,
   Container,
+  Collapse,
   FormControl,
   Grid,
   InputLabel,
@@ -14,7 +15,6 @@ import {
   ListItemIcon,
   ListItemText,
   LinearProgress,
-  CircularProgress,
   Chip,
   Dialog,
   DialogTitle,
@@ -32,18 +32,18 @@ import {
   FiberManualRecord as CircleIcon,
   School as SchoolIcon,
   Language as LanguageIcon,
+  Lightbulb as LightbulbIcon,
 } from '@mui/icons-material';
+import AlphabetLesson from '../components/AlphabetLesson';
+import SpacedRepetitionLesson from '../components/SpacedRepetitionLesson';
+import MnemonicsLesson from '../components/MnemonicsLesson';
 
 const Lessons = () => {
   const [languages, setLanguages] = useState([]);
-  const [selectedLanguage, setSelectedLanguage] = useState('el');
+  const [selectedLanguage, setSelectedLanguage] = useState('');  // Initialize as empty string
   const [lessons, setLessons] = useState([]);
-  const [selectedLesson, setSelectedLesson] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [currentWordIndex, setCurrentWordIndex] = useState(0);
-  const [showTranslation, setShowTranslation] = useState(false);
   const [lessonContent, setLessonContent] = useState(null);
-  const [practiceMode, setPracticeMode] = useState(false);
 
   useEffect(() => {
     // Fetch available languages
@@ -51,6 +51,10 @@ const Lessons = () => {
       try {
         const response = await axios.get('http://localhost:8000/languages');
         setLanguages(response.data);
+        // Set default language after languages are loaded
+        if (response.data.length > 0) {
+          setSelectedLanguage('el');  // Set default to Greek
+        }
       } catch (error) {
         console.error('Error fetching languages:', error);
       }
@@ -81,27 +85,68 @@ const Lessons = () => {
   };
 
   const handleStartLesson = async (lesson) => {
-    setSelectedLesson(lesson);
     try {
       setLoading(true);
       const response = await axios.get(`http://localhost:8000/lessons/${selectedLanguage}/${lesson.id}`);
       console.log('Full lesson response:', response.data);
       
-      if (lesson.title === "100 Most Popular Greek Words") {
-        setLessonContent(response.data);
+      let newLessonContent = null;
+
+      if (lesson.title === "Greek Alphabet") {
+        console.log('Alphabet lesson content:', response.data.content);
+        newLessonContent = {
+          ...response.data,
+          lesson_type: "alphabet"
+        };
+      } else if (lesson.title === "Spaced Repetition Practice") {
+        newLessonContent = {
+          ...response.data,
+          lesson_type: "spaced_repetition"
+        };
+      } else if (lesson.title === "Mnemonic Devices for Greek") {
+        console.log('Mnemonic lesson data:', response.data);
+        console.log('Mnemonic lesson content:', response.data.content);
+        newLessonContent = {
+          ...response.data,
+          lesson_type: "mnemonics"
+        };
+      } else if (lesson.title === "100 Most Popular Greek Words") {
+        newLessonContent = response.data;
       } else if (lesson.title === "Basic Greetings and Farewells") {
-        setLessonContent({
+        newLessonContent = {
           ...response.data,
           words: response.data.content.words || [],
           lesson_type: "greetings"
-        });
+        };
+      } else if (lesson.title === "Contextual Learning") {
+        newLessonContent = {
+          ...response.data,
+          words: response.data.content.words || [],
+          lesson_type: "contextual"
+        };
+      } else if (lesson.title === "Visual Association Learning") {
+        console.log('Visual lesson data:', response.data);
+        console.log('Visual lesson content:', response.data.content);
+        console.log('Visual lesson words:', response.data.content.words);
+        // Log the structure of the first word to debug
+        console.log('Sample word structure:', response.data.content.words[0]);
+        
+        newLessonContent = {
+          ...response.data,
+          lesson_type: "visual",
+          content: response.data.content
+        };
       } else {
-        const lessonData = {
+        newLessonContent = {
           ...response.data,
           words: response.data.content.words || response.data.content.practice_words || [],
           lesson_type: response.data.lesson_type
         };
-        setLessonContent(lessonData);
+      }
+
+      // Only update state if the content has changed
+      if (JSON.stringify(newLessonContent) !== JSON.stringify(lessonContent)) {
+        setLessonContent(newLessonContent);
       }
     } catch (error) {
       console.error('Error fetching lesson:', error);
@@ -110,37 +155,7 @@ const Lessons = () => {
     }
   };
 
-  const handleStartPractice = () => {
-    console.log('Starting practice with content:', lessonContent); // Debug log
-    if (lessonContent?.words && lessonContent.words.length > 0) {
-      setPracticeMode(true);
-      setCurrentWordIndex(0);
-    } else {
-      console.error('No words available for practice');
-    }
-  };
-
-  const handleNextWord = () => {
-    if (currentWordIndex < lessonContent.words.length - 1) {
-      setCurrentWordIndex(prev => prev + 1);
-      setShowTranslation(false);
-    }
-  };
-
-  const handlePreviousWord = () => {
-    if (currentWordIndex > 0) {
-      setCurrentWordIndex(prev => prev - 1);
-      setShowTranslation(false);
-    }
-  };
-
-  const toggleTranslation = () => {
-    setShowTranslation(!showTranslation);
-  };
-
   const handleCloseLesson = () => {
-    setPracticeMode(false);
-    setCurrentWordIndex(0);
     setLessonContent(null);
   };
 
@@ -250,30 +265,112 @@ const Lessons = () => {
         </Grid>
       )}
 
-      <Dialog open={!!lessonContent} onClose={handleCloseLesson} maxWidth="md" fullWidth>
+      <Dialog
+        open={lessonContent !== null}
+        onClose={handleCloseLesson}
+        maxWidth="lg"
+        fullWidth
+      >
         {lessonContent && (
           <>
             <DialogTitle>
-              <Box display="flex" alignItems="center">
-                <Typography variant="h5" component="span">
-                  {getLessonTypeIcon(lessonContent.lesson_type)}
-                </Typography>
-                <Typography variant="h5" component="span" ml={2}>
-                  {lessonContent.title} - Level {lessonContent.level}
-                </Typography>
-              </Box>
+              {getLessonTypeIcon(lessonContent.lesson_type)} {lessonContent.title}
             </DialogTitle>
             <DialogContent>
               {loading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                  <CircularProgress />
-                </Box>
+                <LinearProgress />
               ) : (
                 <Box>
-                  <Typography variant="subtitle1" gutterBottom>
-                    {lessonContent.description}
+                  <Typography variant="body1" gutterBottom>
+                    {lessonContent.content.description}
                   </Typography>
-                  
+
+                  {lessonContent.lesson_type === "alphabet" && (
+                    <AlphabetLesson content={lessonContent.content} />
+                  )}
+
+                  {lessonContent.lesson_type === "spaced_repetition" && (
+                    <SpacedRepetitionLesson content={lessonContent.content} />
+                  )}
+
+                  {lessonContent.lesson_type === "mnemonics" && (
+                    <MnemonicsLesson lesson={lessonContent} />
+                  )}
+
+                  {lessonContent.lesson_type === "visual" && (
+                    <>
+                      {/* Visualization Tips */}
+                      {lessonContent.content.visualization_tips && (
+                        <Box sx={{ 
+                          bgcolor: 'rgba(33, 150, 243, 0.1)', 
+                          p: 2, 
+                          borderRadius: 2,
+                          border: '1px solid rgba(33, 150, 243, 0.3)',
+                          mb: 3
+                        }}>
+                          <Typography variant="h6" gutterBottom>
+                            <LightbulbIcon sx={{ mr: 1, verticalAlign: 'bottom' }} />
+                            Visualization Tips
+                          </Typography>
+                          <List>
+                            {lessonContent.content.visualization_tips.map((tip, index) => (
+                              <ListItem key={index}>
+                                <ListItemIcon>
+                                  <CircleIcon sx={{ fontSize: 8 }} />
+                                </ListItemIcon>
+                                <ListItemText primary={tip} />
+                              </ListItem>
+                            ))}
+                          </List>
+                        </Box>
+                      )}
+
+                      {/* Visual Word Grid */}
+                      <VisualWordGrid 
+                        words={lessonContent.content.words || []} 
+                        visualizationTips={lessonContent.content.visualization_tips || []}
+                      />
+                    </>
+                  )}
+
+                  {(lessonContent.lesson_type === "greetings" || 
+                    lessonContent.lesson_type === "contextual") && (
+                    <>
+                      <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
+                        {lessonContent.lesson_type === "greetings" ? 'Basic Greetings and Farewells' : 'Contextual Learning Words'}
+                      </Typography>
+                      <Grid container spacing={2}>
+                        {lessonContent.words.map((word, index) => (
+                          <Grid item xs={12} sm={6} md={4} key={index}>
+                            <Card sx={{ height: '100%' }}>
+                              <CardContent>
+                                <Typography variant="h5" gutterBottom>
+                                  {word.word}
+                                </Typography>
+                                <Typography variant="subtitle1" color="text.secondary" gutterBottom>
+                                  {word.transliteration}
+                                </Typography>
+                                <Typography variant="h6" gutterBottom>
+                                  {word.translation}
+                                </Typography>
+                                <Box sx={{ 
+                                  bgcolor: 'rgba(156, 39, 176, 0.1)', 
+                                  p: 2, 
+                                  borderRadius: 1,
+                                  mt: 2
+                                }}>
+                                  <Typography variant="body2">
+                                    {word.context}
+                                  </Typography>
+                                </Box>
+                              </CardContent>
+                            </Card>
+                          </Grid>
+                        ))}
+                      </Grid>
+                    </>
+                  )}
+
                   {/* Display lesson content */}
                   <Box sx={{ mt: 3 }}>
                     {/* Introduction if available */}
@@ -374,49 +471,6 @@ const Lessons = () => {
                       </>
                     )}
 
-                    {/* Greetings and Farewells */}
-                    {lessonContent?.lesson_type === "greetings" && lessonContent?.words && (
-                      <>
-                        <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
-                          Basic Greetings and Farewells
-                        </Typography>
-                        <Grid container spacing={2}>
-                          {lessonContent.words.map((word, index) => (
-                            <Grid item xs={12} sm={6} key={index}>
-                              <Card sx={{ height: '100%' }}>
-                                <CardContent>
-                                  <Grid container spacing={2}>
-                                    <Grid item xs={12}>
-                                      <Typography variant="h5" gutterBottom>
-                                        {word.word}
-                                      </Typography>
-                                      <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-                                        {word.transliteration}
-                                      </Typography>
-                                      <Typography variant="h6" gutterBottom>
-                                        {word.translation}
-                                      </Typography>
-                                      <Box sx={{ 
-                                        bgcolor: 'rgba(156, 39, 176, 0.1)', 
-                                        p: 2, 
-                                        borderRadius: 2,
-                                        border: '1px solid rgba(156, 39, 176, 0.3)',
-                                        mt: 2
-                                      }}>
-                                        <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
-                                          <strong>Usage:</strong> {word.context}
-                                        </Typography>
-                                      </Box>
-                                    </Grid>
-                                  </Grid>
-                                </CardContent>
-                              </Card>
-                            </Grid>
-                          ))}
-                        </Grid>
-                      </>
-                    )}
-
                     {/* Words section - Spaced Repetition */}
                     {lessonContent?.lesson_type === 'spaced_repetition' && lessonContent?.words && lessonContent.words.length > 0 && (
                       <>
@@ -431,7 +485,7 @@ const Lessons = () => {
                         }}>
                           {/* Progress indicator */}
                           <Typography variant="subtitle1" color="text.secondary">
-                            Word {currentWordIndex + 1} of {lessonContent.words.length}
+                            Word 1 of {lessonContent.words.length}
                           </Typography>
                           
                           {/* Flashcard */}
@@ -446,7 +500,6 @@ const Lessons = () => {
                                 transform: 'scale(1.02)'
                               }
                             }}
-                            onClick={toggleTranslation}
                           >
                             <CardContent sx={{ 
                               height: '100%', 
@@ -457,35 +510,23 @@ const Lessons = () => {
                               p: 4
                             }}>
                               <Typography variant="h4" gutterBottom align="center">
-                                {lessonContent.words[currentWordIndex].word}
+                                {lessonContent.words[0].word}
                               </Typography>
                               <Typography variant="subtitle1" color="text.secondary" gutterBottom align="center">
-                                {lessonContent.words[currentWordIndex].transliteration}
+                                {lessonContent.words[0].transliteration}
                               </Typography>
-                              {showTranslation && (
-                                <Box sx={{ 
-                                  mt: 3, 
-                                  p: 2, 
-                                  bgcolor: 'primary.light', 
-                                  color: 'primary.contrastText',
-                                  borderRadius: 2,
-                                  width: '100%'
-                                }}>
-                                  <Typography variant="h5" align="center">
-                                    {lessonContent.words[currentWordIndex].translation}
-                                  </Typography>
-                                </Box>
-                              )}
-                              {!showTranslation && (
-                                <Typography 
-                                  variant="body2" 
-                                  color="text.secondary" 
-                                  align="center" 
-                                  sx={{ mt: 2 }}
-                                >
-                                  Click to reveal translation
+                              <Box sx={{ 
+                                mt: 3, 
+                                p: 2, 
+                                bgcolor: 'primary.light', 
+                                color: 'primary.contrastText',
+                                borderRadius: 2,
+                                width: '100%'
+                              }}>
+                                <Typography variant="h5" align="center">
+                                  {lessonContent.words[0].translation}
                                 </Typography>
-                              )}
+                              </Box>
                             </CardContent>
                           </Card>
 
@@ -493,16 +534,14 @@ const Lessons = () => {
                           <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
                             <Button
                               variant="outlined"
-                              onClick={handlePreviousWord}
-                              disabled={currentWordIndex === 0}
+                              disabled
                               startIcon={<NavigateBeforeIcon />}
                             >
                               Previous
                             </Button>
                             <Button
                               variant="contained"
-                              onClick={handleNextWord}
-                              disabled={currentWordIndex === lessonContent.words.length - 1}
+                              disabled
                               endIcon={<NavigateNextIcon />}
                             >
                               Next
@@ -585,6 +624,44 @@ const Lessons = () => {
                       </>
                     )}
 
+                    {/* Contextual Learning */}
+                    {lessonContent?.lesson_type === "contextual" && lessonContent?.content?.words && (
+                      <>
+                        <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
+                          Contextual Learning Words
+                        </Typography>
+                        <Grid container spacing={2}>
+                          {lessonContent.content.words.map((word, index) => (
+                            <Grid item xs={12} sm={6} md={4} key={index}>
+                              <Card sx={{ height: '100%' }}>
+                                <CardContent>
+                                  <Typography variant="h5" gutterBottom>
+                                    {word.word}
+                                  </Typography>
+                                  <Typography variant="subtitle1" color="text.secondary" gutterBottom>
+                                    {word.transliteration}
+                                  </Typography>
+                                  <Typography variant="h6" gutterBottom>
+                                    {word.translation}
+                                  </Typography>
+                                  <Box sx={{ 
+                                    bgcolor: 'rgba(156, 39, 176, 0.1)', 
+                                    p: 2, 
+                                    borderRadius: 1,
+                                    mt: 2
+                                  }}>
+                                    <Typography variant="body2">
+                                      {word.context}
+                                    </Typography>
+                                  </Box>
+                                </CardContent>
+                              </Card>
+                            </Grid>
+                          ))}
+                        </Grid>
+                      </>
+                    )}
+
                     {/* Example Situations if available */}
                     {lessonContent.example_situations && lessonContent.example_situations.length > 0 && (
                       <>
@@ -616,6 +693,131 @@ const Lessons = () => {
         )}
       </Dialog>
     </Container>
+  );
+};
+
+const VisualWordGrid = ({ words, visualizationTips }) => {
+  const [expandedIndex, setExpandedIndex] = React.useState(-1);
+
+  // Log the words to check for duplicates and structure
+  React.useEffect(() => {
+    console.log("VisualWordGrid words:", words);
+    const uniqueWords = new Set(words.map(word => word.word));
+    console.log("Unique words count:", uniqueWords.size);
+    console.log("Total words count:", words.length);
+  }, [words]);
+
+  return (
+    <Grid container spacing={2}>
+      {words.map((word, index) => {
+        const hasVisualization = word.visualization_text && word.visualization_text.length > 0;
+        
+        return (
+          <Grid item xs={12} sm={6} md={4} key={index}>
+            <Card 
+              sx={{ 
+                height: '100%',
+                cursor: hasVisualization ? 'pointer' : 'default',
+                transition: 'transform 0.2s, box-shadow 0.2s',
+                '&:hover': hasVisualization ? {
+                  transform: 'translateY(-4px)',
+                  boxShadow: 4,
+                } : {}
+              }}
+              onClick={() => hasVisualization && setExpandedIndex(expandedIndex === index ? -1 : index)}
+            >
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  {word.word}
+                </Typography>
+                <Typography variant="body1" color="text.secondary" gutterBottom>
+                  {word.transliteration}
+                </Typography>
+                <Typography variant="body1" gutterBottom>
+                  {word.translation}
+                </Typography>
+                
+                {/* Visual Hint - Always visible */}
+                {word.visual_hint && (
+                  <Box sx={{ 
+                    bgcolor: 'rgba(156, 39, 176, 0.1)', 
+                    p: 2, 
+                    borderRadius: 2,
+                    border: '1px solid rgba(156, 39, 176, 0.3)',
+                    mt: 2,
+                    mb: 2
+                  }}>
+                    <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
+                      <strong>Quick Hint:</strong> {word.visual_hint}
+                    </Typography>
+                  </Box>
+                )}
+                
+                {/* Detailed Visualization - Shown on click */}
+                {hasVisualization && (
+                  <Collapse in={expandedIndex === index}>
+                    <Box sx={{ 
+                      bgcolor: 'rgba(63, 81, 181, 0.1)', 
+                      p: 2, 
+                      borderRadius: 2,
+                      border: '1px solid rgba(63, 81, 181, 0.3)',
+                      mt: 2
+                    }}>
+                      <Typography variant="body1">
+                        <strong>Visualization Exercise:</strong>
+                      </Typography>
+                      <Typography variant="body1" sx={{ mt: 1 }}>
+                        {word.visualization_text}
+                      </Typography>
+                    </Box>
+                  </Collapse>
+                )}
+
+                {/* Click indicator - Only show if there's visualization text */}
+                {hasVisualization && (
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    mt: 2,
+                    color: 'text.secondary'
+                  }}>
+                    <Typography variant="caption">
+                      {expandedIndex === index ? 'Click to hide visualization' : 'Click to show visualization'}
+                    </Typography>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+        );
+      })}
+      {visualizationTips && (
+        <Grid item xs={12}>
+          <Box sx={{ 
+            bgcolor: 'rgba(33, 150, 243, 0.1)', 
+            p: 2, 
+            borderRadius: 2,
+            border: '1px solid rgba(33, 150, 243, 0.3)',
+            mb: 3
+          }}>
+            <Typography variant="h6" gutterBottom>
+              <LightbulbIcon sx={{ mr: 1, verticalAlign: 'bottom' }} />
+              Visualization Tips
+            </Typography>
+            <List>
+              {visualizationTips.map((tip, index) => (
+                <ListItem key={index}>
+                  <ListItemIcon>
+                    <CircleIcon sx={{ fontSize: 8 }} />
+                  </ListItemIcon>
+                  <ListItemText primary={tip} />
+                </ListItem>
+              ))}
+            </List>
+          </Box>
+        </Grid>
+      )}
+    </Grid>
   );
 };
 

@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from . import models
-from .database import engine
+from .database import engine, SessionLocal
 from .routers import lessons, languages
 import logging
 import sys
@@ -16,8 +16,31 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-# Create database tables
+# Drop and recreate all tables
+models.Base.metadata.drop_all(bind=engine)
 models.Base.metadata.create_all(bind=engine)
+
+# Initialize Greek language
+from sqlalchemy.orm import Session
+db = SessionLocal()
+try:
+    # Create Greek language if it doesn't exist
+    greek = models.Language(
+        code="el",
+        name="Greek",
+        native_name="Ελληνικά",
+        flag="🇬🇷",
+        rtl=False
+    )
+    db.add(greek)
+    db.commit()
+    db.refresh(greek)
+    logger.info("Created Greek language entry")
+except Exception as e:
+    logger.error(f"Error creating Greek language: {str(e)}")
+    db.rollback()
+finally:
+    db.close()
 
 app = FastAPI()
 

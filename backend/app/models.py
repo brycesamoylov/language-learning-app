@@ -104,6 +104,7 @@ class Phrase(Base):
     lesson_id = Column(Integer, ForeignKey("lessons.id"))
     lesson = relationship("Lesson", back_populates="phrases")
     audio_url = Column(String(200), nullable=True)
+    extra_data = Column(JSON, nullable=True)  # Add extra_data column for mnemonics
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
